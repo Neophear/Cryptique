@@ -1,6 +1,6 @@
 ﻿using Cryptique.DataTransferObjects;
 
-namespace Cryptique.Data.Interfaces;
+namespace Cryptique.Data;
 
 public interface IMessageRepository
 {

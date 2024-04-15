@@ -1,23 +1,26 @@
 ﻿using Azure;
 using Azure.Data.Tables;
-using Cryptique.Data.Interfaces;
 using Cryptique.DataTransferObjects;
+using Microsoft.Extensions.Configuration;
 
-namespace Cryptique.Data;
+namespace Cryptique.Data.TableStorage;
 
 public class MessageRepository : IMessageRepository
 {
     private readonly TableClient _tableClient;
 
-    public MessageRepository(string connectionString, string tableName)
+    public MessageRepository(IConfiguration configuration)
     {
+        var connectionString = configuration["AzureTableStorage:ConnectionString"];
+        var tableName = configuration["AzureTableStorage:TableName"];
         _tableClient = new TableClient(connectionString, tableName);
         _tableClient.CreateIfNotExists();
     }
 
-    public async Task AddMessageAsync(MessageEntity message)
+    public Task AddMessageAsync(MessageDto message)
     {
-        await _tableClient.AddEntityAsync(message);
+        var entity = new MessageEntity(message.Id, message.CipherText);
+        return _tableClient.AddEntityAsync(entity);
     }
 
     public async Task<MessageDto?> GetMessageAsync(string id)
@@ -26,17 +29,20 @@ public class MessageRepository : IMessageRepository
         {
             var entity = await _tableClient.GetEntityAsync<MessageEntity>("Message", id);
             
-            Guid.TryParse(entity., out var guid);
+            if (entity == null)
+            {
+                return null;
+            }
             
-            var id = entity.RowKey;
-            
+            var msgEntity = entity.Value;
+
             var dto = new MessageDto
             {
-                Id = entity.RowKey,
-                CipherText = entity.CipherText
+                Id = id,
+                CipherText = msgEntity.CipherText
             };
             
-            return entity.Value;
+            return dto;
         }
         catch (RequestFailedException)
         {

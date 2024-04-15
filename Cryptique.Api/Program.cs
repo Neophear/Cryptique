@@ -1,9 +1,15 @@
+using Cryptique.Data.Extensions;
+using Cryptique.Logic;
+using Cryptique.Logic.Extensions;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDataLayer();
+builder.Services.AddLogicLayer();
 
 var app = builder.Build();
 
@@ -16,29 +22,31 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.MapPost("/message", async (string messageData, IMessageService messageService) =>
+    {
+        var result = await messageService.AddMessageAsync(messageData);
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+        return Results.Ok(result);
+    })
+    .WithName("AddMessage")
+    .WithOpenApi();
+
+app.MapGet("/message/{id}", async (string id, IMessageService messageService) =>
+    {
+        var message = await messageService.GetMessageAsync(id);
+        
+        return message is null ? Results.NotFound(new {message = "Message not found"}) : Results.Ok(message);
+    })
+    .WithName("GetMessage")
+    .WithOpenApi();
+
+app.MapPost("/message/{id}/decrypt", async (string id, byte[] key, IMessageService messageService) =>
+    {
+        var result = await messageService.DecryptMessageAsync(id, key);
+        
+        return result is null ? Results.NotFound(new {message = "Message not found"}) : Results.Ok(result);
+    })
+    .WithName("DecryptMessage")
+    .WithOpenApi();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
