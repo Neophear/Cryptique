@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cryptique.DataTransferObjec
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cryptique.Logic", "Cryptique.Logic\Cryptique.Logic.csproj", "{63998DBD-242B-4EB6-AFCE-0E9BB4130CF9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cryptique.Logic.Tests", "Cryptique.Logic.Tests\Cryptique.Logic.Tests.csproj", "{A6307D14-2816-4FED-AFAE-BA0CC7C5F02D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{63998DBD-242B-4EB6-AFCE-0E9BB4130CF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{63998DBD-242B-4EB6-AFCE-0E9BB4130CF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{63998DBD-242B-4EB6-AFCE-0E9BB4130CF9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6307D14-2816-4FED-AFAE-BA0CC7C5F02D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6307D14-2816-4FED-AFAE-BA0CC7C5F02D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6307D14-2816-4FED-AFAE-BA0CC7C5F02D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6307D14-2816-4FED-AFAE-BA0CC7C5F02D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

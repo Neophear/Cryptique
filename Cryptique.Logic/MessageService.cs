@@ -79,6 +79,9 @@ public class MessageService(IMessageRepository repository) : IMessageService
         };
     }
 
+    public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, string key) =>
+        await DecryptMessageAsync(id, Convert.FromBase64String(key));
+
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, byte[] key)
     {
         var message = await repository.GetMessageAsync(id);

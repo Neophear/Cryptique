@@ -11,8 +11,8 @@ public class MessageRepository : IMessageRepository
 
     public MessageRepository(IConfiguration configuration)
     {
-        var connectionString = configuration["AzureTableStorage:ConnectionString"];
-        var tableName = configuration["AzureTableStorage:TableName"];
+        var connectionString = configuration["StorageConnectionString"];
+        var tableName = configuration["TableName"];
         _tableClient = new TableClient(connectionString, tableName);
         _tableClient.CreateIfNotExists();
     }

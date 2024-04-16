@@ -1,6 +1,7 @@
 using Cryptique.Data.Extensions;
 using Cryptique.Logic;
 using Cryptique.Logic.Extensions;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +41,7 @@ app.MapGet("/message/{id}", async (string id, IMessageService messageService) =>
     .WithName("GetMessage")
     .WithOpenApi();
 
-app.MapPost("/message/{id}/decrypt", async (string id, byte[] key, IMessageService messageService) =>
+app.MapPost("/message/{id}/decrypt", async (string id, [FromBody] string key, IMessageService messageService) =>
     {
         var result = await messageService.DecryptMessageAsync(id, key);
         
