@@ -1,4 +1,5 @@
 using Cryptique.Data.Extensions;
+using Cryptique.DataTransferObjects.Requests;
 using Cryptique.Logic;
 using Cryptique.Logic.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -23,9 +24,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/message", async ([FromBody] string messageData, IMessageService messageService) =>
+app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService messageService) =>
     {
-        var result = await messageService.AddMessageAsync(messageData);
+        if (messageData.Message.Length > 1000)
+            return Results.BadRequest(new {message = "Message is too long"});
+        
+        var result = await messageService.AddMessageAsync(messageData.Message);
 
         return Results.Ok(result);
     })
@@ -41,8 +45,19 @@ app.MapGet("/message/{id}", async (string id, IMessageService messageService) =>
     .WithName("GetMessage")
     .WithOpenApi();
 
-app.MapPost("/message/{id}/decrypt", async (string id, [FromBody] string key, IMessageService messageService) =>
+app.MapPost("/message/{id}/decrypt", async (string id, DecryptMessageRequest request, IMessageService messageService) =>
     {
+        // Verify if key is a valid base64 string
+        byte[] key;
+        try
+        {
+            key = Convert.FromBase64String(request.Key);
+        }
+        catch (Exception e)
+        {
+            return Results.BadRequest(new {message = "Invalid key"});
+        }
+        
         var result = await messageService.DecryptMessageAsync(id, key);
         
         return result is null ? Results.NotFound(new {message = "Message not found"}) : Results.Ok(result);
