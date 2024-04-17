@@ -9,6 +9,7 @@ public class MessageEntity : ITableEntity
     public string RowKey { get; set; } // Message ID
     public string CipherText { get; set; } // Encrypted message
     public string Hash { get; set; } // Hash of the message
+    public string Salt { get; set; }
     public DateTimeOffset? Timestamp { get; set; }
     public ETag ETag { get; set; }
 }

@@ -16,8 +16,15 @@ public class MessageService(IMessageRepository repository) : IMessageService
     {
         var messageData = Encoding.UTF8.GetBytes(message);
         
-        // Hash the message, so that we can verify decryption when needed
-        var messageHash = SHA256.HashData(messageData);
+        // Generate random Salt
+        var salt = new byte[16];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(salt);
+        }
+        
+        // Hash message+salt, so that we can verify decryption when needed
+        var messageHash = SHA256.HashData(messageData.Concat(salt).ToArray());
         
         // Generate a random key for AES encryption
         byte[] key;
@@ -56,7 +63,8 @@ public class MessageService(IMessageRepository repository) : IMessageService
         {
             Id = id,
             CipherText = Convert.ToBase64String(encryptedMessage),
-            Hash = Convert.ToBase64String(messageHash)
+            Hash = Convert.ToBase64String(messageHash),
+            Salt = Convert.ToBase64String(salt)
         };
         
         await repository.AddMessageAsync(messageDto);
@@ -112,7 +120,10 @@ public class MessageService(IMessageRepository repository) : IMessageService
             var decryptedMessage = ms.ToArray();
             
             // Verify the hash of the decrypted message
-            var decryptedMessageHash = SHA256.HashData(decryptedMessage);
+            var messageSalt = Convert.FromBase64String(message.Salt);
+            var decryptedMessageHash =
+                SHA256.HashData(decryptedMessage.Concat(messageSalt).ToArray());
+
             var messageHash = Convert.FromBase64String(message.Hash);
 
             if (!messageHash.SequenceEqual(decryptedMessageHash))

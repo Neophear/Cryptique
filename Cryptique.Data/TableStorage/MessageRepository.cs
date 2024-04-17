@@ -23,7 +23,8 @@ public class MessageRepository : IMessageRepository
         {
             RowKey = message.Id,
             CipherText = message.CipherText,
-            Hash = message.Hash
+            Hash = message.Hash,
+            Salt = message.Salt
         };
         return _tableClient.AddEntityAsync(entity);
     }
@@ -45,7 +46,8 @@ public class MessageRepository : IMessageRepository
             {
                 Id = id,
                 CipherText = msgEntity.CipherText,
-                Hash = msgEntity.Hash
+                Hash = msgEntity.Hash,
+                Salt = msgEntity.Salt
             };
             
             return dto;
