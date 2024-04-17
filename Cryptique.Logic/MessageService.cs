@@ -9,17 +9,21 @@ namespace Cryptique.Logic;
 public class MessageService(IMessageRepository repository) : IMessageService
 {
     private const int KeySize = 256;
-    private const int IvSize = 128;
-    private const int IdLength = 10;
+    private const int IvSize = KeySize / 2;
+    private const int IdLength = 15;
 
     public async Task<CreatedResponse> AddMessageAsync(string message)
     {
         var messageData = Encoding.UTF8.GetBytes(message);
         
+        // Hash the message, so that we can verify decryption when needed
+        var messageHash = SHA256.HashData(messageData);
+        
         // Generate a random key for AES encryption
         byte[] key;
         using (var aes = Aes.Create())
         {
+            aes.KeySize = KeySize;
             aes.GenerateKey();
             key = aes.Key;
         }
@@ -29,11 +33,11 @@ public class MessageService(IMessageRepository repository) : IMessageService
         using (var aes = Aes.Create())
         {
             aes.Key = key;
-            aes.Mode = CipherMode.CBC; // You can choose another mode if needed
+            aes.Mode = CipherMode.CBC;
             aes.GenerateIV();
             using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
             {
-                using (var ms = new System.IO.MemoryStream())
+                using (var ms = new MemoryStream())
                 {
                     ms.Write(aes.IV, 0, aes.IV.Length);
                     await using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
@@ -47,13 +51,12 @@ public class MessageService(IMessageRepository repository) : IMessageService
 
         // Generate a random ID
         var id = GenerateRandomId();
-        
-        var base64CipherText = Convert.ToBase64String(encryptedMessage);
 
         var messageDto = new MessageDto
         {
             Id = id,
-            CipherText = base64CipherText
+            CipherText = Convert.ToBase64String(encryptedMessage),
+            Hash = Convert.ToBase64String(messageHash)
         };
         
         await repository.AddMessageAsync(messageDto);
@@ -88,9 +91,9 @@ public class MessageService(IMessageRepository repository) : IMessageService
 
         if (message == null)
             return null;
+
         try
         {
-
             var encryptedMessage = Convert.FromBase64String(message.CipherText);
 
             using var aes = Aes.Create();
@@ -107,6 +110,13 @@ public class MessageService(IMessageRepository repository) : IMessageService
                 cs.Write(encryptedMessage, iv.Length, encryptedMessage.Length - iv.Length);
             }
             var decryptedMessage = ms.ToArray();
+            
+            // Verify the hash of the decrypted message
+            var decryptedMessageHash = SHA256.HashData(decryptedMessage);
+            var messageHash = Convert.FromBase64String(message.Hash);
+
+            if (!messageHash.SequenceEqual(decryptedMessageHash))
+                return null;
 
             return new DecryptedMessageResponse
             {
@@ -123,7 +133,10 @@ public class MessageService(IMessageRepository repository) : IMessageService
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         var random = new Random();
-        return new string(Enumerable.Repeat(chars, IdLength) // Change 10 to adjust the length of the ID
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return new string(
+            Enumerable
+            .Repeat(chars, IdLength)
+            .Select(s => s[random.Next(s.Length)])
+            .ToArray());
     }
 }

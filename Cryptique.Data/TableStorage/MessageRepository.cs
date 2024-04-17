@@ -19,7 +19,12 @@ public class MessageRepository : IMessageRepository
 
     public Task AddMessageAsync(MessageDto message)
     {
-        var entity = new MessageEntity(message.Id, message.CipherText);
+        var entity = new MessageEntity
+        {
+            RowKey = message.Id,
+            CipherText = message.CipherText,
+            Hash = message.Hash
+        };
         return _tableClient.AddEntityAsync(entity);
     }
 
@@ -39,7 +44,8 @@ public class MessageRepository : IMessageRepository
             var dto = new MessageDto
             {
                 Id = id,
-                CipherText = msgEntity.CipherText
+                CipherText = msgEntity.CipherText,
+                Hash = msgEntity.Hash
             };
             
             return dto;

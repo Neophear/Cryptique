@@ -23,7 +23,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/message", async (string messageData, IMessageService messageService) =>
+app.MapPost("/message", async ([FromBody] string messageData, IMessageService messageService) =>
     {
         var result = await messageService.AddMessageAsync(messageData);
 
