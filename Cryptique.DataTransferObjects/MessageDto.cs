@@ -6,4 +6,5 @@ public class MessageDto
     public string CipherText { get; set; }
     public string Hash { get; set; }
     public string Salt { get; set; }
+    public MessageOptionsDto Options { get; set; }
 }

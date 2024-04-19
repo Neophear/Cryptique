@@ -10,6 +10,10 @@ public class MessageEntity : ITableEntity
     public string CipherText { get; set; } // Encrypted message
     public string Hash { get; set; } // Hash of the message
     public string Salt { get; set; }
+    public int Attempts { get; set; }
+    public int Decrypts { get; set; }
+    public int MaxAttempts { get; set; }
+    public int MaxDecrypts { get; set; }
     public DateTimeOffset? Timestamp { get; set; }
     public ETag ETag { get; set; }
 }

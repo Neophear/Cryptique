@@ -1,8 +1,8 @@
+using Cryptique.Api.Middleware;
 using Cryptique.Data.Extensions;
 using Cryptique.DataTransferObjects.Requests;
 using Cryptique.Logic;
 using Cryptique.Logic.Extensions;
-using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,25 +24,20 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Throttle requests from same IP
+app.UseMiddleware<RequestThrottlingMiddleware>();
+
 app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService messageService) =>
     {
         if (messageData.Message.Length > 1000)
             return Results.BadRequest(new {message = "Message is too long"});
-        
-        var result = await messageService.AddMessageAsync(messageData.Message);
+
+        var result =
+            await messageService.AddMessageAsync(messageData.Message, messageData.MaxAttempts, messageData.MaxDecrypts);
 
         return Results.Ok(result);
     })
     .WithName("AddMessage")
-    .WithOpenApi();
-
-app.MapGet("/message/{id}", async (string id, IMessageService messageService) =>
-    {
-        var message = await messageService.GetMessageAsync(id);
-        
-        return message is null ? Results.NotFound(new {message = "Message not found"}) : Results.Ok(message);
-    })
-    .WithName("GetMessage")
     .WithOpenApi();
 
 app.MapPost("/message/{id}/decrypt", async (string id, DecryptMessageRequest request, IMessageService messageService) =>

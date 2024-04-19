@@ -3,18 +3,38 @@ using System.Text;
 using Cryptique.Data;
 using Cryptique.DataTransferObjects;
 using Cryptique.DataTransferObjects.Responses;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Cryptique.Logic;
 
-public class MessageService(IMessageRepository repository) : IMessageService
+public class MessageService : IMessageService
 {
+    private readonly ILogger<MessageService> _logger;
+    private readonly IMessageRepository _repository;
+    private readonly int _maxSize = 0;
+
+    public MessageService(ILogger<MessageService> logger, IConfiguration config, IMessageRepository repository)
+    {
+        _logger = logger;
+        _repository = repository;
+        
+        // Get MaxSize from appsettings.json
+        _ = int.TryParse(config.GetSection("MessageConfig")["MaxSize"], out _maxSize);
+    }
+
     private const int KeySize = 256;
     private const int IvSize = KeySize / 2;
     private const int IdLength = 15;
 
-    public async Task<CreatedResponse> AddMessageAsync(string message)
+
+    public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts)
     {
         var messageData = Encoding.UTF8.GetBytes(message);
+        
+        // If there is a limit, check if the message is too long
+        if (_maxSize > 0 && messageData.Length > _maxSize)
+            throw new ArgumentException("Message is too long");
         
         // Generate random Salt
         var salt = new byte[16];
@@ -64,10 +84,17 @@ public class MessageService(IMessageRepository repository) : IMessageService
             Id = id,
             CipherText = Convert.ToBase64String(encryptedMessage),
             Hash = Convert.ToBase64String(messageHash),
-            Salt = Convert.ToBase64String(salt)
+            Salt = Convert.ToBase64String(salt),
+            Options = new MessageOptionsDto
+            {
+                Attempts = 0,
+                Decrypts = 0,
+                MaxAttempts = maxAttempts,
+                MaxDecrypts = maxDecrypts
+            }
         };
         
-        await repository.AddMessageAsync(messageDto);
+        await _repository.AddMessageAsync(messageDto);
         
         return new CreatedResponse
         {
@@ -76,30 +103,16 @@ public class MessageService(IMessageRepository repository) : IMessageService
         };
     }
 
-    public async Task<MessageResponse?> GetMessageAsync(string id)
-    {
-        var message = await repository.GetMessageAsync(id);
-        
-        if (message == null)
-            return null;
-
-        return new MessageResponse
-        {
-            Id = message.Id,
-            Cipher = message.CipherText
-        };
-    }
-
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, string key) =>
         await DecryptMessageAsync(id, Convert.FromBase64String(key));
 
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, byte[] key)
     {
-        var message = await repository.GetMessageAsync(id);
+        var message = await _repository.GetMessageAsync(id);
 
         if (message == null)
             return null;
-
+        
         try
         {
             var encryptedMessage = Convert.FromBase64String(message.CipherText);
@@ -107,7 +120,7 @@ public class MessageService(IMessageRepository repository) : IMessageService
             using var aes = Aes.Create();
         
             aes.Key = key;
-            aes.Mode = CipherMode.CBC; // You can choose another mode if needed
+            aes.Mode = CipherMode.CBC;
             var iv = new byte[IvSize / 8];
             Array.Copy(encryptedMessage, 0, iv, 0, iv.Length);
             aes.IV = iv;
@@ -127,16 +140,65 @@ public class MessageService(IMessageRepository repository) : IMessageService
             var messageHash = Convert.FromBase64String(message.Hash);
 
             if (!messageHash.SequenceEqual(decryptedMessageHash))
+            {
+                await IncrementAttemptsAsync(message);
                 return null;
+            }
 
-            return new DecryptedMessageResponse
+            // We have now successfully decrypted the message
+            message.Options.Attempts = 0;
+            
+            var result = new DecryptedMessageResponse
             {
                 Message = Encoding.UTF8.GetString(decryptedMessage)
             };
+            
+            await IncrementDecryptsAsync(message);
+
+            return result;
         }
         catch (Exception e)
         {
+            _logger.LogError(e, "Failed to decrypt message, Id: {Id}", id);
+            await IncrementAttemptsAsync(message);
+            
             return null;
+        }
+    }
+
+    private async Task IncrementDecryptsAsync(MessageDto message)
+    {
+        var decrypts = ++message.Options.Decrypts;
+
+        // If maxDecrypts has been exceeded, delete the message
+        if (message.Options.MaxDecrypts > 0 && decrypts >= message.Options.MaxDecrypts)
+        {
+            _logger.LogInformation("MaxDecrypts {MaxDecrypts} exceeded, deleting message, Id: {Id}",
+                message.Options.MaxDecrypts, message.Id);
+                
+            await _repository.DeleteMessageAsync(message.Id);
+        }
+        else
+        {
+            await _repository.UpdateMessageOptionsAsync(message.Id, message.Options);
+        }
+    }
+
+    private async Task IncrementAttemptsAsync(MessageDto message)
+    {
+        var attempts = ++message.Options.Attempts;
+        
+        // If message attempts has been exceeded, delete the message
+        if (message.Options.MaxAttempts > 0 && attempts > message.Options.MaxAttempts)
+        {
+            _logger.LogWarning("MaxAttempts {MaxAttempts} exceeded, deleting message, Id: {Id}",
+                message.Options.MaxAttempts, message.Id);
+
+            await _repository.DeleteMessageAsync(message.Id);
+        }
+        else
+        {
+            await _repository.UpdateMessageOptionsAsync(message.Id, message.Options);
         }
     }
 
