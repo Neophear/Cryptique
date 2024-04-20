@@ -13,6 +13,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDataLayer();
 builder.Services.AddLogicLayer();
 
+// Add logging
+builder.Services.AddLogging();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

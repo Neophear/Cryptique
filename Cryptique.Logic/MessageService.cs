@@ -27,7 +27,6 @@ public class MessageService : IMessageService
     private const int IvSize = KeySize / 2;
     private const int IdLength = 15;
 
-
     public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts)
     {
         var messageData = Encoding.UTF8.GetBytes(message);
