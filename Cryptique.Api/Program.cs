@@ -14,7 +14,7 @@ builder.Services.AddDataLayer();
 builder.Services.AddLogicLayer();
 
 // Add logging
-builder.Services.AddLogging();
+builder.Services.AddApplicationInsightsTelemetry();
 
 var app = builder.Build();
 
@@ -51,7 +51,7 @@ app.MapPost("/message/{id}/decrypt", async (string id, DecryptMessageRequest req
         {
             key = Convert.FromBase64String(request.Key);
         }
-        catch (Exception e)
+        catch (Exception)
         {
             return Results.BadRequest(new {message = "Invalid key"});
         }
