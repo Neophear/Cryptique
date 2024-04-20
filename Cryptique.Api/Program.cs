@@ -1,5 +1,6 @@
 using Cryptique.Api.Middleware;
 using Cryptique.Data.Extensions;
+using Cryptique.DataTransferObjects.Exceptions;
 using Cryptique.DataTransferObjects.Requests;
 using Cryptique.Logic;
 using Cryptique.Logic.Extensions;
@@ -32,13 +33,17 @@ app.UseMiddleware<RequestThrottlingMiddleware>();
 
 app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService messageService) =>
     {
-        if (messageData.Message.Length > 1000)
-            return Results.BadRequest(new {message = "Message is too long"});
-
-        var result =
-            await messageService.AddMessageAsync(messageData.Message, messageData.MaxAttempts, messageData.MaxDecrypts);
-
-        return Results.Ok(result);
+        try
+        {
+            var result = await messageService.AddMessageAsync(messageData.Message, messageData.MaxAttempts,
+                messageData.MaxDecrypts);
+        
+            return Results.Ok(result);
+        }
+        catch (DataTooLongException e)
+        {
+            return Results.BadRequest(new {message = e.Message, data = new {e.AllowedSize, e.ActualSize}});
+        }
     })
     .WithName("AddMessage")
     .WithOpenApi();

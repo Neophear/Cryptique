@@ -2,6 +2,7 @@
 using System.Text;
 using Cryptique.Data;
 using Cryptique.DataTransferObjects;
+using Cryptique.DataTransferObjects.Exceptions;
 using Cryptique.DataTransferObjects.Responses;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -33,7 +34,7 @@ public class MessageService : IMessageService
         
         // If there is a limit, check if the message is too long
         if (_maxSize > 0 && messageData.Length > _maxSize)
-            throw new ArgumentException("Message is too long");
+            throw new DataTooLongException(_maxSize, messageData.Length);
         
         // Generate random Salt
         var salt = new byte[16];
