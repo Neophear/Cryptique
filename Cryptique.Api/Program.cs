@@ -38,6 +38,9 @@ app.UseHttpsRedirection();
 // Throttle requests from same IP
 app.UseMiddleware<RequestThrottlingMiddleware>();
 
+// Health check
+app.MapGet("/health", () => Results.Ok(new {status = "Healthy"}));
+
 app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService messageService) =>
     {
         try
