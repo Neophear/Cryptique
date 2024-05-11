@@ -8,8 +8,8 @@ public class MessageEntity : ITableEntity
     public string PartitionKey { get; set; } = "Message";
     public string RowKey { get; set; } // Message ID
     public string CipherText { get; set; } // Encrypted message
-    public string Hash { get; set; } // Hash of the message
-    public string Salt { get; set; }
+    public string VerificationCipher { get; set; }
+    public string VerificationBytes { get; set; }
     public int Attempts { get; set; }
     public int Decrypts { get; set; }
     public int MaxAttempts { get; set; }

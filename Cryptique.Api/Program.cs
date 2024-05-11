@@ -13,6 +13,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDataLayer();
 builder.Services.AddLogicLayer();
+builder.Services.AddCors();
 
 // Add logging
 builder.Services.AddApplicationInsightsTelemetry();
@@ -24,6 +25,12 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    
+    // Add cors for localhost
+    app.UseCors(corsPolicyBuilder => corsPolicyBuilder
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod());
 }
 
 app.UseHttpsRedirection();
@@ -46,6 +53,17 @@ app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService
         }
     })
     .WithName("AddMessage")
+    .WithOpenApi();
+
+// Upload file
+app.MapPost("/message/upload", async (IFormFile file, IMessageService messageService) =>
+    {
+        var dataStream = file.OpenReadStream();
+        var result = await messageService.AddMessageAsync(dataStream, 0, 0);
+        
+        return Results.Ok(result);
+    })
+    .WithName("AddMessageFile")
     .WithOpenApi();
 
 app.MapPost("/message/{id}/decrypt", async (string id, DecryptMessageRequest request, IMessageService messageService) =>

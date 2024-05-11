@@ -16,7 +16,7 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
     public async Task TestEncryption()
     {
         // Arrange
-        var message = "Hello, World!";
+        const string message = "Hello, World!";
         var service = new MessageService(_logger, GetConfiguration(), new Mock<IMessageRepository>().Object);
 
         // Act
@@ -32,7 +32,7 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
     public async Task TestDecryption()
     {
         // Arrange
-        var message = "Hello, World!";
+        const string message = "Hello, World!";
         var messageRepositoryMock = GetMessageRepositoryMock();
 
         var service = new MessageService(_logger, GetConfiguration(), messageRepositoryMock.Object);
@@ -51,7 +51,7 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
     public async Task TestAllowMaxDecryptionAttempt()
     {
         // Arrange
-        var message = "Hello, World!";
+        const string message = "Hello, World!";
         var messageRepositoryMock = GetMessageRepositoryMock();
 
         var service = new MessageService(_logger, GetConfiguration(), messageRepositoryMock.Object);
@@ -79,7 +79,7 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
     public async Task TestAllowMaxAttempts()
     {
         // Arrange
-        var message = "Hello, World!";
+        const string message = "Hello, World!";
         var messageRepositoryMock = GetMessageRepositoryMock();
         
         var service = new MessageService(_logger, GetConfiguration(), messageRepositoryMock.Object);

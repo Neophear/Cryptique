@@ -27,8 +27,8 @@ public class MessageRepository : IMessageRepository
         {
             RowKey = message.Id,
             CipherText = message.CipherText,
-            Hash = message.Hash,
-            Salt = message.Salt,
+            VerificationBytes = message.VerificationBytes,
+            VerificationCipher = message.VerificationCipher,
             Attempts = message.Options.MaxAttempts,
             Decrypts = message.Options.MaxDecrypts,
             MaxAttempts = message.Options.MaxDecrypts,
@@ -67,8 +67,8 @@ public class MessageRepository : IMessageRepository
             {
                 Id = id,
                 CipherText = msgEntity.CipherText,
-                Hash = msgEntity.Hash,
-                Salt = msgEntity.Salt,
+                VerificationBytes = msgEntity.VerificationBytes,
+                VerificationCipher = msgEntity.VerificationCipher,
                 Options = new MessageOptionsDto
                 {
                     Attempts = msgEntity.Attempts,

@@ -27,54 +27,35 @@ public class MessageService : IMessageService
     private const int KeySize = 256;
     private const int IvSize = KeySize / 2;
     private const int IdLength = 15;
-
-    public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts)
+    
+    public Task<CreatedResponse> AddMessageAsync(Stream stream, int maxAttempts, int maxDecrypts)
     {
-        var messageData = Encoding.UTF8.GetBytes(message);
-        
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        var data = ms.ToArray();
+
+        return AddMessageAsync(data, maxAttempts, maxDecrypts);
+    }
+
+    public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts) =>
+        await AddMessageAsync(Encoding.UTF8.GetBytes(message), maxAttempts, maxDecrypts);
+
+    public async Task<CreatedResponse> AddMessageAsync(byte[] data, int maxAttempts, int maxDecrypts)
+    {
         // If there is a limit, check if the message is too long
-        if (_maxSize > 0 && messageData.Length > _maxSize)
-            throw new DataTooLongException(_maxSize, messageData.Length);
-        
-        // Generate random Salt
-        var salt = new byte[16];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(salt);
-        }
-        
-        // Hash message+salt, so that we can verify decryption when needed
-        var messageHash = SHA256.HashData(messageData.Concat(salt).ToArray());
+        if (_maxSize > 0 && data.Length > _maxSize)
+            throw new DataTooLongException(_maxSize, data.Length);
         
         // Generate a random key for AES encryption
-        byte[] key;
-        using (var aes = Aes.Create())
-        {
-            aes.KeySize = KeySize;
-            aes.GenerateKey();
-            key = aes.Key;
-        }
+        var key = GenerateRandomKey();
 
-        // Encrypt the message using AES encryption
-        byte[] encryptedMessage;
-        using (var aes = Aes.Create())
-        {
-            aes.Key = key;
-            aes.Mode = CipherMode.CBC;
-            aes.GenerateIV();
-            using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
-            {
-                using (var ms = new MemoryStream())
-                {
-                    ms.Write(aes.IV, 0, aes.IV.Length);
-                    await using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
-                    {
-                        cs.Write(messageData, 0, message.Length);
-                    }
-                    encryptedMessage = ms.ToArray();
-                }
-            }
-        }
+        // Generate random Salt for key verification
+        var verificationBytes = GenerateRandomBytes();
+        
+        // Encrypt the salt with key, to create a verification hash
+        var encryptedVerification = await EncryptData(key, verificationBytes);
+
+        var encryptedMessage = await EncryptData(key, data);
 
         // Generate a random ID
         var id = GenerateRandomId();
@@ -83,8 +64,8 @@ public class MessageService : IMessageService
         {
             Id = id,
             CipherText = Convert.ToBase64String(encryptedMessage),
-            Hash = Convert.ToBase64String(messageHash),
-            Salt = Convert.ToBase64String(salt),
+            VerificationCipher = Convert.ToBase64String(encryptedVerification),
+            VerificationBytes = Convert.ToBase64String(verificationBytes),
             Options = new MessageOptionsDto
             {
                 Attempts = 0,
@@ -103,6 +84,50 @@ public class MessageService : IMessageService
         };
     }
 
+    private static byte[] GenerateRandomKey()
+    {
+        using var aes = Aes.Create();
+
+        aes.KeySize = KeySize;
+        aes.GenerateKey();
+        var key = aes.Key;
+
+        return key;
+    }
+
+    private static byte[] GenerateRandomBytes(int bytes = 16)
+    {
+        var salt = new byte[bytes];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(salt);
+
+        return salt;
+    }
+
+    private static async Task<byte[]> EncryptData(byte[] key, byte[] data)
+    {
+        // Encrypt the message using AES encryption
+        using var aes = Aes.Create();
+        
+        aes.Key = key;
+        aes.Mode = CipherMode.CBC;
+        aes.GenerateIV();
+        
+        using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+        using var ms = new MemoryStream();
+        
+        ms.Write(aes.IV, 0, aes.IV.Length);
+
+        await using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+        {
+            cs.Write(data, 0, data.Length);
+        }
+
+        var encryptedMessage = ms.ToArray();
+
+        return encryptedMessage;
+    }
+
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, string key) =>
         await DecryptMessageAsync(id, Convert.FromBase64String(key));
 
@@ -115,37 +140,23 @@ public class MessageService : IMessageService
         
         try
         {
-            var encryptedMessage = Convert.FromBase64String(message.CipherText);
-
-            using var aes = Aes.Create();
-        
-            aes.Key = key;
-            aes.Mode = CipherMode.CBC;
-            var iv = new byte[IvSize / 8];
-            Array.Copy(encryptedMessage, 0, iv, 0, iv.Length);
-            aes.IV = iv;
-            using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
-            using var ms = new MemoryStream();
-            await using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Write))
-            {
-                cs.Write(encryptedMessage, iv.Length, encryptedMessage.Length - iv.Length);
-            }
-            var decryptedMessage = ms.ToArray();
+            // Check verificationBytes
+            var verificationBytes = Convert.FromBase64String(message.VerificationBytes);
+            var verificationCipher = Convert.FromBase64String(message.VerificationCipher);
             
-            // Verify the hash of the decrypted message
-            var messageSalt = Convert.FromBase64String(message.Salt);
-            var decryptedMessageHash =
-                SHA256.HashData(decryptedMessage.Concat(messageSalt).ToArray());
-
-            var messageHash = Convert.FromBase64String(message.Hash);
-
-            if (!messageHash.SequenceEqual(decryptedMessageHash))
+            var decryptedVerification = await DecryptData(key, verificationCipher);
+            
+            if (!verificationBytes.SequenceEqual(decryptedVerification))
             {
                 await IncrementAttemptsAsync(message);
                 return null;
             }
+            
+            // Verification seems good, so decrypt the message
+            var encryptedMessage = Convert.FromBase64String(message.CipherText);
 
-            // We have now successfully decrypted the message
+            var decryptedMessage = await DecryptData(key, encryptedMessage);
+            
             message.Options.Attempts = 0;
             
             var result = new DecryptedMessageResponse
@@ -166,14 +177,36 @@ public class MessageService : IMessageService
         }
     }
 
+    private static async Task<byte[]> DecryptData(byte[] key, byte[] cipher)
+    {
+        using var aes = Aes.Create();
+        
+        aes.Key = key;
+        aes.Mode = CipherMode.CBC;
+        var iv = new byte[IvSize / 8];
+        Array.Copy(cipher, 0, iv, 0, iv.Length);
+        aes.IV = iv;
+
+        using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+        using var ms = new MemoryStream();
+
+        await using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Write))
+        {
+            cs.Write(cipher, iv.Length, cipher.Length - iv.Length);
+        }
+        var decryptedMessage = ms.ToArray();
+
+        return decryptedMessage;
+    }
+
     private async Task IncrementDecryptsAsync(MessageDto message)
     {
         var decrypts = ++message.Options.Decrypts;
 
-        // If maxDecrypts has been exceeded, delete the message
+        // If maxDecrypts has been reached, delete the message
         if (message.Options.MaxDecrypts > 0 && decrypts >= message.Options.MaxDecrypts)
         {
-            _logger.LogInformation("MaxDecrypts {MaxDecrypts} exceeded, deleting message, Id: {Id}",
+            _logger.LogInformation("MaxDecrypts {MaxDecrypts} reached, deleting message, Id: {Id}",
                 message.Options.MaxDecrypts, message.Id);
                 
             await _repository.DeleteMessageAsync(message.Id);
@@ -188,10 +221,10 @@ public class MessageService : IMessageService
     {
         var attempts = ++message.Options.Attempts;
         
-        // If message attempts has been exceeded, delete the message
-        if (message.Options.MaxAttempts > 0 && attempts > message.Options.MaxAttempts)
+        // If message attempts has been reached, delete the message
+        if (message.Options.MaxAttempts > 0 && attempts >= message.Options.MaxAttempts)
         {
-            _logger.LogWarning("MaxAttempts {MaxAttempts} exceeded, deleting message, Id: {Id}",
+            _logger.LogWarning("MaxAttempts {MaxAttempts} reached, deleting message, Id: {Id}",
                 message.Options.MaxAttempts, message.Id);
 
             await _repository.DeleteMessageAsync(message.Id);

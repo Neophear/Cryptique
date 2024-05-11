@@ -4,7 +4,7 @@ public class MessageDto
 {
     public string Id { get; set; }
     public string CipherText { get; set; }
-    public string Hash { get; set; }
-    public string Salt { get; set; }
+    public string VerificationCipher { get; set; }
+    public string VerificationBytes { get; set; }
     public MessageOptionsDto Options { get; set; }
 }
