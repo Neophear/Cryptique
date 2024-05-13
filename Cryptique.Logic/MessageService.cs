@@ -13,13 +13,13 @@ public class MessageService : IMessageService
 {
     private readonly ILogger<MessageService> _logger;
     private readonly IMessageRepository _repository;
-    private readonly int _maxSize = 0;
+    private readonly int _maxSize; // Max size of message in bytes, default 0 for unlimited
 
     public MessageService(ILogger<MessageService> logger, IConfiguration config, IMessageRepository repository)
     {
         _logger = logger;
         _repository = repository;
-        
+
         // Get MaxSize from appsettings.json
         _ = int.TryParse(config.GetSection("MessageConfig")["MaxSize"], out _maxSize);
     }
@@ -27,7 +27,7 @@ public class MessageService : IMessageService
     private const int KeySize = 256;
     private const int IvSize = KeySize / 2;
     private const int IdLength = 15;
-    
+
     public Task<CreatedResponse> AddMessageAsync(Stream stream, int maxAttempts, int maxDecrypts)
     {
         using var ms = new MemoryStream();
@@ -45,20 +45,20 @@ public class MessageService : IMessageService
         // If there is a limit, check if the message is too long
         if (_maxSize > 0 && data.Length > _maxSize)
             throw new DataTooLongException(_maxSize, data.Length);
-        
+
         // Generate a random key for AES encryption
         var key = GenerateRandomKey();
 
         // Generate random Salt for key verification
         var verificationBytes = GenerateRandomBytes();
-        
-        // Encrypt the salt with key, to create a verification hash
+
+        // Encrypt the salt with key, to create a verification cipher
         var encryptedVerification = await EncryptData(key, verificationBytes);
 
         var encryptedMessage = await EncryptData(key, data);
 
         // Generate a random ID
-        var id = GenerateRandomId();
+        var id = await GenerateRandomId();
 
         var messageDto = new MessageDto
         {
@@ -74,14 +74,39 @@ public class MessageService : IMessageService
                 MaxDecrypts = maxDecrypts
             }
         };
-        
+
         await _repository.AddMessageAsync(messageDto);
-        
+
         return new CreatedResponse
         {
             Id = id,
             Key = Convert.ToBase64String(key)
         };
+    }
+
+    /// <summary>
+    /// Generate a random ID for the message, and throw an exception if it fails to generate a unique Id
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    private async Task<string> GenerateRandomId()
+    {
+        var id = "";
+
+        for (var i = 0; i < 10; i++)
+        {
+            id = GenerateRandomString();
+
+            if (await _repository.GetMessageAsync(id) == null)
+                break;
+        }
+
+        // If id is not empty, return it
+        if (!string.IsNullOrEmpty(id))
+            return id;
+
+        _logger.LogError("Failed to generate unique Id. Last generated id: {Id}", id);
+        throw new Exception("Failed to generate unique Id");
     }
 
     private static byte[] GenerateRandomKey()
@@ -108,14 +133,14 @@ public class MessageService : IMessageService
     {
         // Encrypt the message using AES encryption
         using var aes = Aes.Create();
-        
+
         aes.Key = key;
         aes.Mode = CipherMode.CBC;
         aes.GenerateIV();
-        
+
         using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
         using var ms = new MemoryStream();
-        
+
         ms.Write(aes.IV, 0, aes.IV.Length);
 
         await using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
@@ -137,33 +162,33 @@ public class MessageService : IMessageService
 
         if (message == null)
             return null;
-        
+
         try
         {
             // Check verificationBytes
             var verificationBytes = Convert.FromBase64String(message.VerificationBytes);
             var verificationCipher = Convert.FromBase64String(message.VerificationCipher);
-            
+
             var decryptedVerification = await DecryptData(key, verificationCipher);
-            
+
             if (!verificationBytes.SequenceEqual(decryptedVerification))
             {
                 await IncrementAttemptsAsync(message);
                 return null;
             }
-            
+
             // Verification seems good, so decrypt the message
             var encryptedMessage = Convert.FromBase64String(message.CipherText);
 
             var decryptedMessage = await DecryptData(key, encryptedMessage);
-            
+
             message.Options.Attempts = 0;
-            
+
             var result = new DecryptedMessageResponse
             {
                 Message = Encoding.UTF8.GetString(decryptedMessage)
             };
-            
+
             await IncrementDecryptsAsync(message);
 
             return result;
@@ -172,7 +197,7 @@ public class MessageService : IMessageService
         {
             _logger.LogError(e, "Failed to decrypt message, Id: {Id}", id);
             await IncrementAttemptsAsync(message);
-            
+
             return null;
         }
     }
@@ -180,7 +205,7 @@ public class MessageService : IMessageService
     private static async Task<byte[]> DecryptData(byte[] key, byte[] cipher)
     {
         using var aes = Aes.Create();
-        
+
         aes.Key = key;
         aes.Mode = CipherMode.CBC;
         var iv = new byte[IvSize / 8];
@@ -194,6 +219,7 @@ public class MessageService : IMessageService
         {
             cs.Write(cipher, iv.Length, cipher.Length - iv.Length);
         }
+
         var decryptedMessage = ms.ToArray();
 
         return decryptedMessage;
@@ -208,7 +234,7 @@ public class MessageService : IMessageService
         {
             _logger.LogInformation("MaxDecrypts {MaxDecrypts} reached, deleting message, Id: {Id}",
                 message.Options.MaxDecrypts, message.Id);
-                
+
             await _repository.DeleteMessageAsync(message.Id);
         }
         else
@@ -220,7 +246,7 @@ public class MessageService : IMessageService
     private async Task IncrementAttemptsAsync(MessageDto message)
     {
         var attempts = ++message.Options.Attempts;
-        
+
         // If message attempts has been reached, delete the message
         if (message.Options.MaxAttempts > 0 && attempts >= message.Options.MaxAttempts)
         {
@@ -235,14 +261,14 @@ public class MessageService : IMessageService
         }
     }
 
-    private static string GenerateRandomId()
+    private static string GenerateRandomString()
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         var random = new Random();
         return new string(
             Enumerable
-            .Repeat(chars, IdLength)
-            .Select(s => s[random.Next(s.Length)])
-            .ToArray());
+                .Repeat(chars, IdLength)
+                .Select(s => s[random.Next(s.Length)])
+                .ToArray());
     }
 }
