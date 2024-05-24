@@ -29,8 +29,8 @@ public class MessageRepository : IMessageRepository
             CipherText = message.CipherText,
             VerificationBytes = message.VerificationBytes,
             VerificationCipher = message.VerificationCipher,
-            Attempts = message.Options.MaxAttempts,
-            Decrypts = message.Options.MaxDecrypts,
+            Attempts = message.Options.Attempts,
+            Decrypts = message.Options.Decrypts,
             MaxAttempts = message.Options.MaxDecrypts,
             MaxDecrypts = message.Options.MaxDecrypts
         };
