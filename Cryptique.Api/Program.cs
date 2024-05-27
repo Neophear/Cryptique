@@ -1,3 +1,4 @@
+using Cryptique.Api.HostedServices;
 using Cryptique.Api.Middleware;
 using Cryptique.Data.Extensions;
 using Cryptique.DataTransferObjects.Exceptions;
@@ -14,6 +15,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDataLayer();
 builder.Services.AddLogicLayer();
 builder.Services.AddCors();
+
+// Add hosted services
+builder.Services.AddHostedService<MessageCleanupService>();
 
 // Add logging
 builder.Services.AddApplicationInsightsTelemetry();
@@ -46,7 +50,7 @@ app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService
         try
         {
             var result = await messageService.AddMessageAsync(messageData.Message, messageData.MaxAttempts,
-                messageData.MaxDecrypts);
+                messageData.MaxDecrypts, messageData.Expiration);
         
             return Results.Ok(result);
         }
@@ -62,7 +66,7 @@ app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService
 app.MapPost("/message/upload", async (IFormFile file, IMessageService messageService) =>
     {
         var dataStream = file.OpenReadStream();
-        var result = await messageService.AddMessageAsync(dataStream, 0, 0);
+        var result = await messageService.AddMessageAsync(dataStream, 0, 0, null);
         
         return Results.Ok(result);
     })

@@ -28,19 +28,19 @@ public class MessageService : IMessageService
     private const int IvSize = KeySize / 2;
     private const int IdLength = 15;
 
-    public Task<CreatedResponse> AddMessageAsync(Stream stream, int maxAttempts, int maxDecrypts)
+    public Task<CreatedResponse> AddMessageAsync(Stream stream, int maxAttempts, int maxDecrypts, DateTimeOffset? expiration = null)
     {
         using var ms = new MemoryStream();
         stream.CopyTo(ms);
         var data = ms.ToArray();
 
-        return AddMessageAsync(data, maxAttempts, maxDecrypts);
+        return AddMessageAsync(data, maxAttempts, maxDecrypts, expiration);
     }
 
-    public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts) =>
-        await AddMessageAsync(Encoding.UTF8.GetBytes(message), maxAttempts, maxDecrypts);
+    public async Task<CreatedResponse> AddMessageAsync(string message, int maxAttempts, int maxDecrypts, DateTimeOffset? expiration = null) =>
+        await AddMessageAsync(Encoding.UTF8.GetBytes(message), maxAttempts, maxDecrypts, expiration);
 
-    public async Task<CreatedResponse> AddMessageAsync(byte[] data, int maxAttempts, int maxDecrypts)
+    public async Task<CreatedResponse> AddMessageAsync(byte[] data, int maxAttempts, int maxDecrypts, DateTimeOffset? expiration = null)
     {
         // If there is a limit, check if the message is too long
         if (_maxSize > 0 && data.Length > _maxSize)
@@ -71,7 +71,8 @@ public class MessageService : IMessageService
                 Attempts = 0,
                 Decrypts = 0,
                 MaxAttempts = maxAttempts,
-                MaxDecrypts = maxDecrypts
+                MaxDecrypts = maxDecrypts,
+                Expiration = expiration
             }
         };
 
@@ -80,7 +81,8 @@ public class MessageService : IMessageService
         return new CreatedResponse
         {
             Id = id,
-            Key = Convert.ToBase64String(key)
+            Key = Convert.ToBase64String(key),
+            Expiration = expiration
         };
     }
 
@@ -155,6 +157,8 @@ public class MessageService : IMessageService
 
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, string key) =>
         await DecryptMessageAsync(id, Convert.FromBase64String(key));
+
+    public async Task<int> CleanupExpiredMessages() => await _repository.CleanupExpiredMessagesAsync();
 
     public async Task<DecryptedMessageResponse?> DecryptMessageAsync(string id, byte[] key)
     {

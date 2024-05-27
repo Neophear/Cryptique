@@ -32,7 +32,8 @@ public class MessageRepository : IMessageRepository
             Attempts = message.Options.Attempts,
             Decrypts = message.Options.Decrypts,
             MaxAttempts = message.Options.MaxDecrypts,
-            MaxDecrypts = message.Options.MaxDecrypts
+            MaxDecrypts = message.Options.MaxDecrypts,
+            Expiration = message.Options.Expiration
         };
 
         try
@@ -74,7 +75,8 @@ public class MessageRepository : IMessageRepository
                     Attempts = msgEntity.Attempts,
                     Decrypts = msgEntity.Decrypts,
                     MaxAttempts = msgEntity.MaxAttempts,
-                    MaxDecrypts = msgEntity.MaxDecrypts
+                    MaxDecrypts = msgEntity.MaxDecrypts,
+                    Expiration = msgEntity.Expiration
                 }
             };
             
@@ -95,7 +97,8 @@ public class MessageRepository : IMessageRepository
             Attempts = options.Attempts,
             Decrypts = options.Decrypts,
             MaxAttempts = options.MaxAttempts,
-            MaxDecrypts = options.MaxDecrypts
+            MaxDecrypts = options.MaxDecrypts,
+            Expiration = options.Expiration
         };
         try
         {
@@ -110,5 +113,22 @@ public class MessageRepository : IMessageRepository
         }
     }
 
-    public Task DeleteMessageAsync(string id) => _tableClient.DeleteEntityAsync("Message", id);
+    public async Task DeleteMessageAsync(string id) => await _tableClient.DeleteEntityAsync("Message", id);
+    
+    public async Task<int> CleanupExpiredMessagesAsync()
+    {
+        var expiredMessages =
+            _tableClient.QueryAsync<MessageEntity>("PartitionKey eq 'Message' and Expiration lt datetime'" +
+                                                   DateTimeOffset.UtcNow + "'");
+
+        var tasks = new List<Task>();
+
+        await foreach (var message in expiredMessages)
+        {
+            _logger.Log(LogLevel.Information, "Deleting expired message, Id: {Id}", message.RowKey);
+            tasks.Add(DeleteMessageAsync(message.RowKey));
+        }
+
+        return await Task.WhenAll(tasks).ContinueWith(_ => tasks.Count);
+    }
 }

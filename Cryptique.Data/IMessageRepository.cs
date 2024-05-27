@@ -8,4 +8,5 @@ public interface IMessageRepository
     Task<MessageDto?> GetMessageAsync(string id);
     Task UpdateMessageOptionsAsync(string id, MessageOptionsDto messageOptions);
     Task DeleteMessageAsync(string id);
+    Task<int> CleanupExpiredMessagesAsync();
 }

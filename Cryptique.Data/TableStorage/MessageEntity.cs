@@ -14,6 +14,7 @@ public class MessageEntity : ITableEntity
     public int Decrypts { get; set; }
     public int MaxAttempts { get; set; }
     public int MaxDecrypts { get; set; }
+    public DateTimeOffset? Expiration { get; set; }
     public DateTimeOffset? Timestamp { get; set; }
     public ETag ETag { get; set; }
 }

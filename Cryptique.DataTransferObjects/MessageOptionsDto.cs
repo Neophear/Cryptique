@@ -23,4 +23,9 @@ public class MessageOptionsDto
     /// 0 means no limit
     /// </summary>
     public int MaxDecrypts { get; set; }
+    
+    /// <summary>
+    /// Expiration date for the message
+    /// </summary>
+    public DateTimeOffset? Expiration { get; set; }
 }
