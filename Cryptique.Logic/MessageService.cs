@@ -190,7 +190,7 @@ public class MessageService : IMessageService
 
             var result = new DecryptedMessageResponse
             {
-                Message = Encoding.UTF8.GetString(decryptedMessage)
+                Message = Convert.ToBase64String(decryptedMessage)
             };
 
             await IncrementDecryptsAsync(message);

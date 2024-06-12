@@ -1,3 +1,4 @@
+using System.Text;
 using Cryptique.Data;
 using Cryptique.DataTransferObjects;
 using Cryptique.Logic.Tests.Helpers;
@@ -44,7 +45,8 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
 
         // Assert
         Assert.NotNull(decryptedResponse);
-        Assert.Equal(message, decryptedResponse.Message);
+        var actualMessage = Convert.FromBase64String(decryptedResponse.Message);
+        Assert.Equal(message, Encoding.UTF8.GetString(actualMessage));
     }
 
     [Fact]
@@ -67,9 +69,11 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
         
         // First two attempts should succeed
         Assert.NotNull(decryptedResponse);
-        Assert.Equal(message, decryptedResponse.Message);
+        var actualMessage = Convert.FromBase64String(decryptedResponse.Message);
+        Assert.Equal(message, Encoding.UTF8.GetString(actualMessage));
         Assert.NotNull(decryptedResponse2);
-        Assert.Equal(message, decryptedResponse2.Message);
+        var actualMessage2 = Convert.FromBase64String(decryptedResponse2.Message);
+        Assert.Equal(message, Encoding.UTF8.GetString(actualMessage2));
         
         // Third attempt should return null, as the message has been deleted
         Assert.Null(decryptedResponse3);
@@ -106,14 +110,16 @@ public class MessageServiceTests(ITestOutputHelper outputHelper)
         
         // First attempt should succeed
         Assert.NotNull(decryptedResponseSuccess1);
-        Assert.Equal(message, decryptedResponseSuccess1.Message);
+        var actualMessage1 = Convert.FromBase64String(decryptedResponseSuccess1.Message);
+        Assert.Equal(message, Encoding.UTF8.GetString(actualMessage1));
         
         // Second attempt should fail
         Assert.Null(decryptedResponseFail1);
         
         // Third attempt should succeed
         Assert.NotNull(decryptedResponseSuccess2);
-        Assert.Equal(message, decryptedResponseSuccess2.Message);
+        var actualMessage2 = Convert.FromBase64String(decryptedResponseSuccess2.Message);
+        Assert.Equal(message, Encoding.UTF8.GetString(actualMessage2));
         
         // Fourth attempt should fail
         Assert.Null(decryptedResponseFail2);
