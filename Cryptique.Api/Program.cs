@@ -71,10 +71,17 @@ app.MapPost("/message", async (CreateMessageRequest messageData, IMessageService
 // Upload file
 app.MapPost("/message/upload", async (IFormFile file, IMessageService messageService) =>
     {
-        var dataStream = file.OpenReadStream();
-        var result = await messageService.AddMessageAsync(dataStream, 0, 0, null);
+        try
+        {
+            var dataStream = file.OpenReadStream();
+            var result = await messageService.AddMessageAsync(dataStream, 0, 0, null);
         
-        return Results.Ok(result);
+            return Results.Ok(result);
+        }
+        catch (DataTooLongException e)
+        {
+            return Results.BadRequest(new {message = e.Message, data = new {e.AllowedSize, e.ActualSize}});
+        }
     })
     .WithName("AddMessageFile")
     .WithOpenApi()
