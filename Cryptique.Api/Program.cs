@@ -24,6 +24,12 @@ builder.Services.AddApplicationInsightsTelemetry();
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    // Add exception handling middleware so exceptions are not thrown to the client
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -71,7 +77,8 @@ app.MapPost("/message/upload", async (IFormFile file, IMessageService messageSer
         return Results.Ok(result);
     })
     .WithName("AddMessageFile")
-    .WithOpenApi();
+    .WithOpenApi()
+    .DisableAntiforgery();
 
 app.MapPost("/message/{id}/decrypt", async (string id, DecryptMessageRequest request, IMessageService messageService) =>
     {
