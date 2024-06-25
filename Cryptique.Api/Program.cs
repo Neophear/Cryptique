@@ -29,9 +29,13 @@ if (!app.Environment.IsDevelopment())
     // Add exception handling middleware so exceptions are not thrown to the client
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     
+    var corsString = app.Configuration["Cors"] ?? "https://cryptique.dev";
+    
+    var corsOrigins = corsString.Split(",");
+    
     // Add cors for production
     app.UseCors(corsPolicyBuilder => corsPolicyBuilder
-        .WithOrigins("https://cryptique.dev") // TODO: Should probably be an environment variable
+        .WithOrigins(corsOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod());
 }
