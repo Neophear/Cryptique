@@ -117,9 +117,9 @@ public class MessageRepository : IMessageRepository
     
     public async Task<int> CleanupExpiredMessagesAsync()
     {
+        var currentTime = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
         var expiredMessages =
-            _tableClient.QueryAsync<MessageEntity>("PartitionKey eq 'Message' and Expiration lt datetime'" +
-                                                   DateTimeOffset.UtcNow + "'");
+            _tableClient.QueryAsync<MessageEntity>($"PartitionKey eq 'Message' and Expiration lt datetime'{currentTime}'");
 
         var tasks = new List<Task>();
 
